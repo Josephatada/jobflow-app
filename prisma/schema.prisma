@@ -25,6 +25,7 @@ enum Source {
 
 model Application {
   id              String           @id @default(cuid())
+  userId          String
   company         String
   roleTitle       String
   jobUrl          String?
@@ -43,6 +44,13 @@ model Application {
 
   stageHistory    StageHistory[]
   interviewRounds InterviewRound[]
+  ghostSnoozes    GhostSnooze[]
+
+  @@index([userId])
+  @@index([userId, stage])
+  @@index([userId, updatedAt])
+  @@index([userId, followUpDate])
+  @@index([userId, createdAt])
 }
 
 model StageHistory {
@@ -63,4 +71,27 @@ model InterviewRound {
   createdAt     DateTime    @default(now())
 
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
+
+model UserSettings {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  ghostThresholdDays Int      @default(14)
+  emailDigestEnabled Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model GhostSnooze {
+  id            String      @id @default(cuid())
+  userId        String
+  applicationId String
+  snoozedUntil  DateTime
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, applicationId])
+  @@index([userId, snoozedUntil])
 }

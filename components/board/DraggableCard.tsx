@@ -4,16 +4,21 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { ApplicationCard } from "./ApplicationCard";
 import { cn } from "@/lib/utils";
-import type { Application } from "@/lib/mock-data";
+import type { ApplicationView } from "@/lib/types";
 
 interface DraggableCardProps {
-  application: Application;
+  application: ApplicationView;
   onClick: () => void;
+  onStarToggle?: (app: ApplicationView) => void;
 }
 
-export function DraggableCard({ application, onClick }: DraggableCardProps) {
+export function DraggableCard({ application, onClick, onStarToggle }: DraggableCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: application.id,
+    data: {
+      type: "application",
+      stage: application.stage,
+    },
   });
 
   return (
@@ -24,7 +29,7 @@ export function DraggableCard({ application, onClick }: DraggableCardProps) {
       {...listeners}
       {...attributes}
     >
-      <ApplicationCard application={application} onClick={onClick} />
+      <ApplicationCard application={application} onClick={onClick} onStarToggle={onStarToggle} />
     </div>
   );
 }

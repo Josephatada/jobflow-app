@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import {
-  DndContext, DragOverlay, PointerSensor,
+  DndContext, DragOverlay, PointerSensor, closestCorners,
   useSensor, useSensors, type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { Plus, LayoutGrid, List } from "lucide-react";
@@ -13,35 +13,27 @@ import { GhostToast } from "./GhostToast";
 import { FilterBar, DEFAULT_FILTERS, type Filters } from "./FilterBar";
 import { TableView } from "./TableView";
 import { STAGES } from "@/lib/stages";
-import { MOCK_APPLICATIONS, type Application } from "@/lib/mock-data";
 import { daysSince } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { getGhostSuggestions } from "@/lib/ghost";
+import {
+  changeStageAction,
+  deleteApplicationAction,
+  saveApplicationAction,
+  snoozeGhostAction,
+  toggleStarAction,
+} from "@/app/actions";
+import type { ApplicationView, UserSettingsView } from "@/lib/types";
 import type { Stage } from "@prisma/client";
 
 type DrawerState =
   | { mode: "closed" }
-  | { mode: "edit"; app: Application }
+  | { mode: "edit"; app: ApplicationView }
   | { mode: "new"; stage: Stage };
 
 type ViewMode = "kanban" | "table";
 
-const GHOST_THRESHOLD_DAYS = 14;
-const SNOOZE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
-const SNOOZE_KEY = "jobflow_ghost_snooze";
-
-function getSnoozed(): Record<string, number> {
-  try { return JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? "{}"); }
-  catch { return {}; }
-}
-function snoozeApp(id: string) {
-  const s = getSnoozed(); s[id] = Date.now() + SNOOZE_DURATION_MS;
-  localStorage.setItem(SNOOZE_KEY, JSON.stringify(s));
-}
-function isSnoozed(id: string) {
-  const s = getSnoozed(); return !!s[id] && s[id] > Date.now();
-}
-
-function applyFilters(apps: Application[], filters: Filters): Application[] {
+function applyFilters(apps: ApplicationView[], filters: Filters): ApplicationView[] {
   const now = Date.now();
   const cutoff = filters.dateRange === "30d" ? now - 30 * 86400000 : filters.dateRange === "90d" ? now - 90 * 86400000 : 0;
   const q = filters.search.toLowerCase();
@@ -54,25 +46,58 @@ function applyFilters(apps: Application[], filters: Filters): Application[] {
   });
 }
 
-export function KanbanBoard() {
-  const [applications, setApplications] = useState<Application[]>(MOCK_APPLICATIONS);
+function getDropStage(event: DragEndEvent): Stage | null {
+  const over = event.over;
+  if (!over) return null;
+  const stage = over.data.current?.stage;
+  if (typeof stage === "string") return stage as Stage;
+  if (typeof over.id === "string" && over.id.startsWith("column-")) {
+    return over.id.replace("column-", "") as Stage;
+  }
+  return null;
+}
+
+function getEventPointer(event: Event, delta?: { x: number; y: number }) {
+  const offset = delta ?? { x: 0, y: 0 };
+  if ("clientX" in event && "clientY" in event) {
+    return {
+      x: Number(event.clientX) + offset.x,
+      y: Number(event.clientY) + offset.y,
+    };
+  }
+  if ("changedTouches" in event) {
+    const touch = (event as TouchEvent).changedTouches[0];
+    if (touch) return { x: touch.clientX + offset.x, y: touch.clientY + offset.y };
+  }
+  return null;
+}
+
+export function KanbanBoard({
+  initialApplications,
+  settings,
+  snoozedApplicationIds,
+}: {
+  initialApplications: ApplicationView[];
+  settings: UserSettingsView;
+  snoozedApplicationIds: string[];
+}) {
+  const [applications, setApplications] = useState<ApplicationView[]>(initialApplications);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [view, setView] = useState<ViewMode>("kanban");
   const [drawer, setDrawer] = useState<DrawerState>({ mode: "closed" });
-  const [draggingApp, setDraggingApp] = useState<Application | null>(null);
-  const [ghostQueue, setGhostQueue] = useState<Application[]>([]);
+  const [draggingApp, setDraggingApp] = useState<ApplicationView | null>(null);
+  const [snoozedIds, setSnoozedIds] = useState(() => new Set(snoozedApplicationIds));
+  const [activeMobileStage, setActiveMobileStage] = useState<Stage>("wishlist");
+  const [error, setError] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const columnRefs = useRef(new Map<Stage, HTMLDivElement>());
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  const buildGhostQueue = useCallback((apps: Application[]) => {
-    setGhostQueue(apps.filter(
-      (a) => (a.stage === "applied" || a.stage === "interview") &&
-        daysSince(a.updatedAt) >= GHOST_THRESHOLD_DAYS && !isSnoozed(a.id)
-    ));
+  const registerColumn = useCallback((stage: Stage, node: HTMLDivElement | null) => {
+    if (node) columnRefs.current.set(stage, node);
+    else columnRefs.current.delete(stage);
   }, []);
-
-  useEffect(() => { buildGhostQueue(applications); }, [applications, buildGhostQueue]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -87,11 +112,15 @@ export function KanbanBoard() {
   }, []);
 
   const filtered = applyFilters(applications, filters);
+  const ghostQueue = useMemo(
+    () => getGhostSuggestions(applications, settings.ghostThresholdDays, snoozedIds),
+    [applications, settings.ghostThresholdDays, snoozedIds]
+  );
   const currentToast = ghostQueue[0] ?? null;
 
-  const grouped = STAGES.reduce<Record<Stage, Application[]>>(
+  const grouped = STAGES.reduce<Record<Stage, ApplicationView[]>>(
     (acc, s) => { acc[s.slug] = filtered.filter((a) => a.stage === s.slug); return acc; },
-    {} as Record<Stage, Application[]>
+    {} as Record<Stage, ApplicationView[]>
   );
 
   const overdueCount = applications.filter((a) => a.followUpDate && new Date(a.followUpDate) < new Date()).length;
@@ -100,28 +129,96 @@ export function KanbanBoard() {
   function handleDragStart(e: DragStartEvent) {
     setDraggingApp(applications.find((a) => a.id === e.active.id) ?? null);
   }
-  function handleDragEnd(e: DragEndEvent) {
+  async function handleDragEnd(e: DragEndEvent) {
     setDraggingApp(null);
-    const { active, over } = e;
-    if (!over) return;
-    const newStage = over.id as Stage;
+    const { active } = e;
+    const newStage = getPointerDropStage(e) ?? getDropStage(e);
+    if (!newStage) return;
     const app = applications.find((a) => a.id === active.id);
     if (!app || app.stage === newStage) return;
-    setApplications((prev) => prev.map((a) => a.id === app.id ? { ...a, stage: newStage, updatedAt: new Date() } : a));
+    await handleStageChange(app.id, newStage);
   }
-  function handleSave(app: Application) {
+  async function handleSave(app: ApplicationView) {
+    const previous = applications;
     setApplications((prev) => {
       const exists = prev.find((a) => a.id === app.id);
-      return exists ? prev.map((a) => a.id === app.id ? app : a) : [...prev, app];
+      return exists ? prev.map((a) => a.id === app.id ? app : a) : [{ ...app, id: app.id || crypto.randomUUID() }, ...prev];
     });
+    const result = await saveApplicationAction(app);
+    if (result.ok) {
+      setApplications((prev) => {
+        const withoutTemp = prev.filter((a) => a.id !== app.id);
+        const exists = previous.some((a) => a.id === app.id);
+        return exists
+          ? prev.map((a) => a.id === app.id ? result.data : a)
+          : [result.data, ...withoutTemp];
+      });
+      setError("");
+    } else {
+      setApplications(previous);
+      setError(result.error);
+    }
   }
-  function handleDelete(id: string) { setApplications((prev) => prev.filter((a) => a.id !== id)); }
-  function handleGhostAccept(app: Application) {
-    setApplications((prev) => prev.map((a) => a.id === app.id ? { ...a, stage: "ghosted", updatedAt: new Date() } : a));
-    setGhostQueue((q) => q.filter((a) => a.id !== app.id));
+  async function handleDelete(id: string) {
+    const previous = applications;
+    setApplications((prev) => prev.filter((a) => a.id !== id));
+    const result = await deleteApplicationAction(id);
+    if (!result.ok) {
+      setApplications(previous);
+      setError(result.error);
+    }
   }
-  function handleGhostSnooze(app: Application) {
-    snoozeApp(app.id); setGhostQueue((q) => q.filter((a) => a.id !== app.id));
+  async function handleStageChange(id: string, stage: Stage) {
+    const previous = applications;
+    setApplications((prev) => prev.map((a) => a.id === id ? { ...a, stage, updatedAt: new Date().toISOString() } : a));
+    const result = await changeStageAction(id, stage);
+    if (result.ok) {
+      setApplications((prev) => prev.map((a) => a.id === id ? result.data : a));
+      setError("");
+    } else {
+      setApplications(previous);
+      setError(result.error);
+    }
+  }
+  async function handleStarToggle(app: ApplicationView) {
+    const previous = applications;
+    const nextStarred = !app.isStarred;
+    setApplications((prev) => prev.map((a) => a.id === app.id ? { ...a, isStarred: nextStarred } : a));
+    const result = await toggleStarAction(app.id, nextStarred);
+    if (result.ok) {
+      setApplications((prev) => prev.map((a) => a.id === app.id ? result.data : a));
+      setError("");
+    } else {
+      setApplications(previous);
+      setError(result.error);
+    }
+  }
+  async function handleGhostAccept(app: ApplicationView) {
+    await handleStageChange(app.id, "ghosted");
+  }
+  async function handleGhostSnooze(app: ApplicationView) {
+    setSnoozedIds((prev) => new Set(prev).add(app.id));
+    const result = await snoozeGhostAction(app.id);
+    if (!result.ok) setError(result.error);
+  }
+
+  function getPointerDropStage(event: DragEndEvent): Stage | null {
+    const pointer = getEventPointer(event.activatorEvent, event.delta);
+    if (!pointer) return null;
+    for (const stage of STAGES) {
+      const node = columnRefs.current.get(stage.slug);
+      if (!node) continue;
+      const rect = node.getBoundingClientRect();
+      if (
+        pointer.x >= rect.left &&
+        pointer.x <= rect.right &&
+        pointer.y >= rect.top &&
+        pointer.y <= rect.bottom
+      ) {
+        return stage.slug;
+      }
+    }
+    return null;
   }
 
   const drawerApp = drawer.mode === "edit" ? drawer.app : null;
@@ -195,7 +292,7 @@ export function KanbanBoard() {
       </div>
 
       {/* ── Filter toolbar ────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 px-5 h-[40px] bg-[#161614] border-b border-[#2d2b27] shrink-0">
+      <div className="flex items-center justify-between gap-3 px-3 sm:px-5 py-2 sm:py-0 sm:min-h-[40px] bg-[#161614] border-b border-[#2d2b27] shrink-0">
         <FilterBar filters={filters} onChange={setFilters} searchRef={searchRef} />
         <span className="text-[11px] text-[#6b6762] hidden lg:flex items-center gap-1 shrink-0">
           <kbd className="px-1.5 py-0.5 bg-[#252320] rounded text-[10px] font-mono border border-[#2d2b27]">N</kbd>
@@ -203,16 +300,61 @@ export function KanbanBoard() {
         </span>
       </div>
 
+      {error && (
+        <div className="px-4 py-2 text-xs text-red-300 bg-red-950/40 border-b border-red-900/40">
+          {error}
+        </div>
+      )}
+
       {/* Board or Table */}
       <div className="flex-1 overflow-auto">
         {view === "kanban" ? (
-          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div className="flex gap-4 px-6 pt-5 pb-6 min-w-max">
+          <DndContext
+            id="jobflow-board-dnd"
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="sm:hidden sticky top-0 z-10 bg-[#111110] border-b border-[#2d2b27] px-3 py-2 overflow-x-auto">
+              <div className="flex gap-1 min-w-max">
+                {STAGES.map((stage) => (
+                  <button
+                    key={stage.slug}
+                    onClick={() => setActiveMobileStage(stage.slug)}
+                    className={cn(
+                      "h-9 px-3 rounded-full text-xs font-semibold border flex items-center gap-1.5",
+                      activeMobileStage === stage.slug
+                        ? "bg-orange-950/50 border-orange-900/60 text-orange-400"
+                        : "bg-[#1c1b19] border-[#2d2b27] text-[#a8a49e]"
+                    )}
+                  >
+                    {stage.label}
+                    <span className="text-[10px] text-[#6b6762]">{grouped[stage.slug].length}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="hidden sm:flex gap-4 px-6 pt-5 pb-6 min-w-max">
               {STAGES.map((s) => (
                 <DroppableColumn
                   key={s.slug} {...s}
                   applications={grouped[s.slug]}
                   onCardClick={(app) => setDrawer({ mode: "edit", app })}
+                  onStarToggle={handleStarToggle}
+                  registerColumn={registerColumn}
+                  onAdd={(stage) => setDrawer({ mode: "new", stage })}
+                />
+              ))}
+            </div>
+            <div className="sm:hidden px-3 py-3 pb-24">
+              {STAGES.filter((stage) => stage.slug === activeMobileStage).map((s) => (
+                <DroppableColumn
+                  key={s.slug} {...s}
+                  applications={grouped[s.slug]}
+                  onCardClick={(app) => setDrawer({ mode: "edit", app })}
+                  onStarToggle={handleStarToggle}
+                  registerColumn={registerColumn}
                   onAdd={(stage) => setDrawer({ mode: "new", stage })}
                 />
               ))}
@@ -230,18 +372,17 @@ export function KanbanBoard() {
             applications={filtered}
             onRowClick={(app) => setDrawer({ mode: "edit", app })}
             onStageChange={(id, stage) =>
-              setApplications((prev) =>
-                prev.map((a) => a.id === id ? { ...a, stage, updatedAt: new Date() } : a)
-              )
+              handleStageChange(id, stage)
             }
             onDelete={handleDelete}
+            onStarToggle={handleStarToggle}
           />
         )}
       </div>
 
       {/* Ghost toast */}
       {currentToast && (
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="fixed bottom-20 left-3 right-3 sm:left-auto sm:bottom-6 sm:right-6 z-50">
           <GhostToast
             key={currentToast.id}
             company={currentToast.company}

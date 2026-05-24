@@ -1,4 +1,4 @@
-import type { Application } from "./mock-data";
+import type { ApplicationView } from "./types";
 import { STAGES } from "./stages";
 
 export type DateRange = "30d" | "90d" | "all";
@@ -10,12 +10,12 @@ function cutoff(range: DateRange): number {
   return 0;
 }
 
-export function filterByRange(apps: Application[], range: DateRange): Application[] {
+export function filterByRange(apps: ApplicationView[], range: DateRange): ApplicationView[] {
   const c = cutoff(range);
   return c ? apps.filter((a) => new Date(a.createdAt).getTime() >= c) : apps;
 }
 
-export function byStage(apps: Application[]) {
+export function byStage(apps: ApplicationView[]) {
   return STAGES.map((s) => ({
     name: s.label,
     slug: s.slug,
@@ -33,7 +33,7 @@ const STAGE_COLORS: Record<string, string> = {
   ghosted:   "#d1d5db",
 };
 
-export function responseRate(apps: Application[]): number {
+export function responseRate(apps: ApplicationView[]): number {
   const applied = apps.filter((a) =>
     ["applied", "interview", "offer", "rejected", "ghosted"].includes(a.stage)
   ).length;
@@ -44,7 +44,7 @@ export function responseRate(apps: Application[]): number {
   return Math.round((responded / applied) * 100);
 }
 
-export function weeklyVolume(apps: Application[]) {
+export function weeklyVolume(apps: ApplicationView[]) {
   const weeks: Record<string, number> = {};
   apps.forEach((a) => {
     const d = new Date(a.createdAt);
@@ -60,7 +60,7 @@ export function weeklyVolume(apps: Application[]) {
     .slice(-10);
 }
 
-export function topSources(apps: Application[]) {
+export function topSources(apps: ApplicationView[]) {
   const counts: Record<string, { applied: number; interview: number }> = {};
   apps.forEach((a) => {
     const s = a.source ?? "other";
@@ -73,7 +73,7 @@ export function topSources(apps: Application[]) {
     .sort((a, b) => b.applied - a.applied);
 }
 
-export function funnel(apps: Application[]) {
+export function funnel(apps: ApplicationView[]) {
   const stages = ["applied", "interview", "offer"] as const;
   return stages.map((s) => ({
     name: STAGES.find((st) => st.slug === s)!.label,
@@ -85,7 +85,7 @@ export function funnel(apps: Application[]) {
   }));
 }
 
-export function avgDaysInStage(apps: Application[]): { stage: string; days: number }[] {
+export function avgDaysInStage(apps: ApplicationView[]): { stage: string; days: number }[] {
   // Approximate: use updatedAt - createdAt for apps that moved past a stage
   const moved = apps.filter((a) =>
     ["interview", "offer", "rejected", "ghosted"].includes(a.stage) && a.dateApplied

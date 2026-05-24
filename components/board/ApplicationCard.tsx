@@ -1,11 +1,12 @@
 import { Star, Calendar } from "lucide-react";
 import { cn, daysSince, isOverdue, formatDate } from "@/lib/utils";
 import { STAGE_MAP } from "@/lib/stages";
-import type { Application } from "@/lib/mock-data";
+import type { ApplicationView } from "@/lib/types";
 
 interface ApplicationCardProps {
-  application: Application;
+  application: ApplicationView;
   onClick: () => void;
+  onStarToggle?: (app: ApplicationView) => void;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -26,16 +27,18 @@ const AVATAR_COLORS = [
 ];
 
 function getAvatarStyle(company: string): [string, string] {
-  const idx = company.charCodeAt(0) % AVATAR_COLORS.length;
+  const idx = (company || "J").charCodeAt(0) % AVATAR_COLORS.length;
   return AVATAR_COLORS[idx] as [string, string];
 }
 
-export function ApplicationCard({ application, onClick }: ApplicationCardProps) {
+export function ApplicationCard({ application, onClick, onStarToggle }: ApplicationCardProps) {
   const { company, roleTitle, isStarred, followUpDate, updatedAt, stage, source } = application;
+  const companyLabel = company || "Untitled application";
+  const roleLabel = roleTitle || "No role title";
   const days    = daysSince(updatedAt);
   const overdue = isOverdue(followUpDate);
   const stageInfo = STAGE_MAP[stage];
-  const [avatarBg, avatarText] = getAvatarStyle(company);
+  const [avatarBg, avatarText] = getAvatarStyle(companyLabel);
 
   return (
     // Outer shell (double-bezel)
@@ -57,7 +60,7 @@ export function ApplicationCard({ application, onClick }: ApplicationCardProps) 
           <div className="flex items-center gap-2">
             {/* Company avatar */}
             <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center shrink-0", avatarBg)}>
-              <span className={cn("text-[9px] font-bold", avatarText)}>{company.slice(0, 2).toUpperCase()}</span>
+              <span className={cn("text-[9px] font-bold", avatarText)}>{companyLabel.slice(0, 2).toUpperCase()}</span>
             </div>
             {/* Stage: dot + text, no background */}
             <span className="inline-flex items-center gap-1">
@@ -78,11 +81,15 @@ export function ApplicationCard({ application, onClick }: ApplicationCardProps) 
 
           {/* Star — visible on hover or if starred */}
           <button
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onStarToggle?.(application);
+            }}
             className={cn(
-              "transition-opacity duration-300",
-              isStarred ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              "min-h-7 min-w-7 flex items-center justify-center rounded-md transition-opacity duration-300",
+              isStarred ? "opacity-100" : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
             )}
+            aria-label={isStarred ? "Unstar application" : "Star application"}
           >
             <Star className={cn(
               "w-3 h-3 transition-colors",
@@ -93,8 +100,8 @@ export function ApplicationCard({ application, onClick }: ApplicationCardProps) 
 
         {/* Row 2: Company + role */}
         <div className="mb-3">
-          <p className="text-[13px] font-semibold text-[#f0ede8] leading-snug tracking-[-0.02em]">{company}</p>
-          <p className="text-[11px] text-[#6b6762] mt-0.5 leading-snug line-clamp-1">{roleTitle}</p>
+          <p className="text-[13px] font-semibold text-[#f0ede8] leading-snug tracking-[-0.02em]">{companyLabel}</p>
+          <p className="text-[11px] text-[#6b6762] mt-0.5 leading-snug line-clamp-1">{roleLabel}</p>
         </div>
 
         {/* Row 3: source + follow-up/time */}

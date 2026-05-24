@@ -85,12 +85,23 @@ const samples: {
 ];
 
 async function main() {
+  const userId = process.env.SEED_USER_ID;
+  if (!userId) {
+    throw new Error("Set SEED_USER_ID to a Supabase auth user id before seeding.");
+  }
+
   await prisma.stageHistory.deleteMany();
   await prisma.interviewRound.deleteMany();
+  await prisma.ghostSnooze.deleteMany();
   await prisma.application.deleteMany();
+  await prisma.userSettings.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
 
   for (const data of samples) {
-    const app = await prisma.application.create({ data });
+    const app = await prisma.application.create({ data: { ...data, userId } });
     await prisma.stageHistory.create({
       data: {
         applicationId: app.id,

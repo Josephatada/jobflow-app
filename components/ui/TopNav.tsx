@@ -3,20 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Briefcase } from "lucide-react";
+import { BarChart3, Briefcase, LayoutGrid, ListChecks, LogOut, Settings } from "lucide-react";
+import { signOutAction } from "@/app/actions";
 
 const NAV_ITEMS = [
-  { href: "/board",    label: "Board" },
-  { href: "/summary",  label: "Summary" },
-  { href: "/stats",    label: "Stats" },
-  { href: "/settings", label: "Settings" },
+  { href: "/board",    label: "Board", icon: LayoutGrid },
+  { href: "/summary",  label: "Summary", icon: ListChecks },
+  { href: "/stats",    label: "Stats", icon: BarChart3 },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function TopNav() {
   const pathname = usePathname();
+  if (pathname === "/login") return null;
 
   return (
-    <header className="h-[52px] w-full bg-[#1c1b19] border-b border-[#2d2b27] flex items-center px-4 shrink-0">
+    <>
+    <header className="hidden sm:flex h-[52px] w-full bg-[#1c1b19] border-b border-[#2d2b27] items-center px-4 shrink-0">
       {/* Logo */}
       <Link href="/board" className="flex items-center gap-2.5 mr-8 select-none">
         <div className="w-7 h-7 bg-orange-600 rounded-lg flex items-center justify-center shrink-0 shadow-[0_1px_4px_rgba(234,88,12,0.30)]">
@@ -53,6 +56,34 @@ export function TopNav() {
           );
         })}
       </nav>
+      <form action={signOutAction} className="ml-auto">
+        <button
+          type="submit"
+          className="h-8 px-3 rounded-md flex items-center gap-2 text-[13px] font-medium text-[#6b6762] hover:text-[#a8a49e] hover:bg-[#252320]"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          Sign out
+        </button>
+      </form>
     </header>
+    <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 h-[64px] pb-[env(safe-area-inset-bottom)] bg-[#1c1b19]/95 backdrop-blur border-t border-[#2d2b27] grid grid-cols-4">
+      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        const active = pathname === href || pathname.startsWith(href);
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "flex flex-col items-center justify-center gap-1 text-[10px] font-semibold",
+              active ? "text-orange-400" : "text-[#6b6762]"
+            )}
+          >
+            <Icon className="w-5 h-5" />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+    </>
   );
 }

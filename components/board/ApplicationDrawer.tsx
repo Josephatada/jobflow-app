@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X, Star, Trash2, ExternalLink, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/Select";
 import { cn, formatDate } from "@/lib/utils";
 import { STAGES, STAGE_MAP } from "@/lib/stages";
 import { InterviewRounds } from "./InterviewRounds";
-import type { Application } from "@/lib/mock-data";
+import type { ApplicationView } from "@/lib/types";
 import type { Stage, Source } from "@prisma/client";
 
 const SOURCES: { value: Source; label: string }[] = [
@@ -22,18 +22,22 @@ const SOURCES: { value: Source; label: string }[] = [
 const INPUT_CLS =
   "bg-[#252320] border border-[#2d2b27] text-[#f0ede8] rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-orange-600/30 focus:border-orange-600/50 w-full";
 
+const MOBILE_STAGE_HELP =
+  "Use this stage picker to move the job between Saved, Applied, Interview, Offer, Rejected, and Ghosted.";
+
 interface ApplicationDrawerProps {
-  application: Application | null;
+  application: ApplicationView | null;
   isNew?: boolean;
   defaultStage?: Stage;
   onClose: () => void;
-  onSave: (app: Application) => void;
+  onSave: (app: ApplicationView) => void;
   onDelete: (id: string) => void;
 }
 
-function emptyApp(stage: Stage = "wishlist"): Application {
+function emptyApp(stage: Stage = "wishlist"): ApplicationView {
+  const now = new Date().toISOString();
   return {
-    id: crypto.randomUUID(),
+    id: `new-${crypto.randomUUID()}`,
     company: "",
     roleTitle: "",
     jobUrl: null,
@@ -47,8 +51,8 @@ function emptyApp(stage: Stage = "wishlist"): Application {
     followUpDate: null,
     isStarred: false,
     notes: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: now,
+    updatedAt: now,
     interviewRounds: [],
   };
 }
@@ -61,34 +65,27 @@ export function ApplicationDrawer({
   onSave,
   onDelete,
 }: ApplicationDrawerProps) {
-  const [form, setForm] = useState<Application>(
+  const [form, setForm] = useState<ApplicationView>(
     application ?? emptyApp(defaultStage)
   );
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [errors, setErrors] = useState<{ company?: string; roleTitle?: string }>({});
+  const [errors, setErrors] = useState<{ jobUrl?: string }>({});
 
-  useEffect(() => {
-    setForm(application ?? emptyApp(defaultStage));
-    setErrors({});
-    setConfirmDelete(false);
-  }, [application, defaultStage]);
-
-  function set<K extends keyof Application>(key: K, value: Application[K]) {
-    setForm((prev) => ({ ...prev, [key]: value || null }));
+  function set<K extends keyof ApplicationView>(key: K, value: ApplicationView[K]) {
+    setForm((prev) => ({ ...prev, [key]: value === "" ? null : value }));
   }
 
   function validate() {
     const e: typeof errors = {};
-    if (!form.company.trim()) e.company = "Required";
-    if (!form.roleTitle.trim()) e.roleTitle = "Required";
+    if (!form.jobUrl?.trim()) e.jobUrl = "Required";
     return e;
   }
 
   function handleSave() {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-    onSave({ ...form, updatedAt: new Date() });
+    onSave({ ...form, updatedAt: new Date().toISOString() });
     onClose();
   }
 
@@ -98,15 +95,19 @@ export function ApplicationDrawer({
     onClose();
   }
 
-  function handleCopyUrl() {
+  async function handleCopyUrl() {
     if (!form.jobUrl) return;
-    navigator.clipboard.writeText(form.jobUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(form.jobUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
   }
 
   function handleQuickStage(stage: Stage) {
-    setForm((prev) => ({ ...prev, stage, updatedAt: new Date() }));
+    setForm((prev) => ({ ...prev, stage, updatedAt: new Date().toISOString() }));
   }
 
   const stageInfo = STAGES.find((s) => s.slug === form.stage);
@@ -114,16 +115,16 @@ export function ApplicationDrawer({
   return (
     /* Backdrop */
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
       {/* Modal card */}
       <div
-        className="bg-[#1c1b19] border border-[#2d2b27] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.6)] w-full max-w-[560px] max-h-[85vh] flex flex-col mx-4 animate-[fadeScaleIn_0.18s_cubic-bezier(0.16,1,0.3,1)]"
+        className="bg-[#1c1b19] border border-[#2d2b27] rounded-t-2xl sm:rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.6)] w-full sm:max-w-[560px] h-[82dvh] max-h-[720px] sm:h-auto sm:max-h-[85vh] flex flex-col sm:mx-4 animate-[fadeScaleIn_0.18s_cubic-bezier(0.16,1,0.3,1)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#2d2b27] px-6 py-4 shrink-0">
+        <div className="flex items-center justify-between border-b border-[#2d2b27] px-4 sm:px-6 py-4 pt-[max(1rem,env(safe-area-inset-top))] shrink-0">
           <div className="flex items-center gap-2">
             {isNew ? (
               <span className="text-[13px] font-semibold text-[#f0ede8]">New Application</span>
@@ -162,7 +163,7 @@ export function ApplicationDrawer({
         </div>
 
         {/* Body */}
-        <div className="overflow-y-auto px-6 py-5 flex-1 space-y-5">
+        <div className="overflow-y-auto px-4 sm:px-6 py-5 flex-1 space-y-5">
           {/* Stage pipeline (edit mode) */}
           {!isNew && (
             <StagePipeline currentStage={form.stage} />
@@ -176,7 +177,6 @@ export function ApplicationDrawer({
               value={form.company}
               onChange={(e) => setForm((p) => ({ ...p, company: e.target.value }))}
               placeholder="e.g. Stripe"
-              error={errors.company}
             />
             <Input
               id="roleTitle"
@@ -184,7 +184,6 @@ export function ApplicationDrawer({
               value={form.roleTitle}
               onChange={(e) => setForm((p) => ({ ...p, roleTitle: e.target.value }))}
               placeholder="e.g. Senior Frontend Engineer"
-              error={errors.roleTitle}
             />
           </div>
 
@@ -199,6 +198,27 @@ export function ApplicationDrawer({
               <option key={s.slug} value={s.slug}>{s.label}</option>
             ))}
           </Select>
+          <p className="sm:hidden -mt-3 text-[11px] leading-relaxed text-[#6b6762]">
+            {MOBILE_STAGE_HELP}
+          </p>
+
+          <div className="sm:hidden grid grid-cols-3 gap-1.5">
+            {STAGES.map((stage) => (
+              <button
+                key={stage.slug}
+                type="button"
+                onClick={() => handleQuickStage(stage.slug)}
+                className={cn(
+                  "min-h-10 rounded-lg border px-2 text-[11px] font-semibold",
+                  form.stage === stage.slug
+                    ? "border-orange-900/60 bg-orange-950/50 text-orange-400"
+                    : "border-[#2d2b27] bg-[#252320] text-[#a8a49e]"
+                )}
+              >
+                {stage.label}
+              </button>
+            ))}
+          </div>
 
           {/* Quick actions */}
           {form.stage !== "rejected" && form.stage !== "ghosted" && (
@@ -227,9 +247,9 @@ export function ApplicationDrawer({
               <input
                 type="url"
                 value={form.jobUrl ?? ""}
-                onChange={(e) => set("jobUrl", e.target.value as Application["jobUrl"])}
+                onChange={(e) => set("jobUrl", e.target.value as ApplicationView["jobUrl"])}
                 placeholder="https://..."
-                className={INPUT_CLS}
+                className={cn(INPUT_CLS, errors.jobUrl && "border-red-500/60 focus:border-red-500/60 focus:ring-red-500/20")}
               />
               <div className="flex gap-1">
                 {form.jobUrl && (
@@ -253,22 +273,23 @@ export function ApplicationDrawer({
                 )}
               </div>
             </div>
+            {errors.jobUrl && <p className="text-xs text-red-400">{errors.jobUrl}</p>}
           </div>
 
           {/* Row: Location + Source */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               id="location"
               label="Location"
               value={form.location ?? ""}
-              onChange={(e) => set("location", e.target.value as Application["location"])}
+              onChange={(e) => set("location", e.target.value as ApplicationView["location"])}
               placeholder="Remote"
             />
             <Select
               id="source"
               label="Source"
               value={form.source ?? ""}
-              onChange={(e) => set("source", (e.target.value || null) as Application["source"])}
+              onChange={(e) => set("source", (e.target.value || null) as ApplicationView["source"])}
             >
               <option value="">—</option>
               {SOURCES.map((s) => (
@@ -278,30 +299,30 @@ export function ApplicationDrawer({
           </div>
 
           {/* Row: Date applied + Follow-up */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               id="dateApplied"
               label="Date applied"
               type="date"
               value={form.dateApplied ? new Date(form.dateApplied).toISOString().split("T")[0] : ""}
-              onChange={(e) => set("dateApplied", e.target.value ? new Date(e.target.value) as Application["dateApplied"] : null)}
+              onChange={(e) => set("dateApplied", e.target.value ? new Date(e.target.value).toISOString() as ApplicationView["dateApplied"] : null)}
             />
             <Input
               id="followUpDate"
               label="Follow-up date"
               type="date"
               value={form.followUpDate ? new Date(form.followUpDate).toISOString().split("T")[0] : ""}
-              onChange={(e) => set("followUpDate", e.target.value ? new Date(e.target.value) as Application["followUpDate"] : null)}
+              onChange={(e) => set("followUpDate", e.target.value ? new Date(e.target.value).toISOString() as ApplicationView["followUpDate"] : null)}
             />
           </div>
 
           {/* Row: Contact name + email */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               id="contactName"
               label="Contact name"
               value={form.contactName ?? ""}
-              onChange={(e) => set("contactName", e.target.value as Application["contactName"])}
+              onChange={(e) => set("contactName", e.target.value as ApplicationView["contactName"])}
               placeholder="Recruiter / HM"
             />
             <Input
@@ -309,7 +330,7 @@ export function ApplicationDrawer({
               label="Contact email"
               type="email"
               value={form.contactEmail ?? ""}
-              onChange={(e) => set("contactEmail", e.target.value as Application["contactEmail"])}
+              onChange={(e) => set("contactEmail", e.target.value as ApplicationView["contactEmail"])}
               placeholder="name@company.com"
             />
           </div>
@@ -319,7 +340,7 @@ export function ApplicationDrawer({
             id="salaryRange"
             label="Salary range"
             value={form.salaryRange ?? ""}
-            onChange={(e) => set("salaryRange", e.target.value as Application["salaryRange"])}
+            onChange={(e) => set("salaryRange", e.target.value as ApplicationView["salaryRange"])}
             placeholder="e.g. $140k–$180k"
           />
 
@@ -337,7 +358,7 @@ export function ApplicationDrawer({
             <label className="text-[12px] font-medium text-[#a8a49e]">Notes</label>
             <textarea
               value={form.notes ?? ""}
-              onChange={(e) => set("notes", e.target.value as Application["notes"])}
+              onChange={(e) => set("notes", e.target.value as ApplicationView["notes"])}
               rows={4}
               placeholder="Interview prep, talking points, salary notes…"
               className={cn(INPUT_CLS, "resize-none")}
@@ -353,7 +374,7 @@ export function ApplicationDrawer({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-[#2d2b27] px-6 py-4 flex items-center justify-between shrink-0">
+        <div className="border-t border-[#2d2b27] px-4 sm:px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex items-center justify-between shrink-0">
           {!isNew ? (
             <Button
               variant="danger"

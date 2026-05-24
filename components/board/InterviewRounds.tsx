@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import { Plus, Trash2, Pencil, Check, X } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { formatDate } from "@/lib/utils";
-import type { InterviewRound } from "@/lib/mock-data";
+import type { InterviewRoundView } from "@/lib/types";
 
 interface InterviewRoundsProps {
-  rounds: InterviewRound[];
+  rounds: InterviewRoundView[];
   applicationId: string;
-  onChange: (rounds: InterviewRound[]) => void;
+  onChange: (rounds: InterviewRoundView[]) => void;
 }
 
 type EditingRound = { label: string; date: string };
@@ -26,7 +25,7 @@ export function InterviewRounds({ rounds, applicationId, onChange }: InterviewRo
     setForm({ label: "", date: "" });
   }
 
-  function startEdit(round: InterviewRound) {
+  function startEdit(round: InterviewRoundView) {
     setEditingId(round.id);
     setAdding(false);
     setForm({
@@ -43,12 +42,13 @@ export function InterviewRounds({ rounds, applicationId, onChange }: InterviewRo
 
   function commitAdd() {
     if (!form.label.trim()) return;
-    const newRound: InterviewRound = {
+    const now = new Date().toISOString();
+    const newRound: InterviewRoundView = {
       id: crypto.randomUUID(),
       applicationId,
       label: form.label.trim(),
-      date: form.date ? new Date(form.date) : null,
-      createdAt: new Date(),
+      date: form.date ? new Date(form.date).toISOString() : null,
+      createdAt: now,
     };
     onChange([...rounds, newRound]);
     setAdding(false);
@@ -60,7 +60,7 @@ export function InterviewRounds({ rounds, applicationId, onChange }: InterviewRo
     onChange(
       rounds.map((r) =>
         r.id === id
-          ? { ...r, label: form.label.trim(), date: form.date ? new Date(form.date) : null }
+          ? { ...r, label: form.label.trim(), date: form.date ? new Date(form.date).toISOString() : null }
           : r
       )
     );

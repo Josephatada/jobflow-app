@@ -1,7 +1,6 @@
 "use client";
 
 import { Ghost, X, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface GhostToastProps {
   company: string;
@@ -12,7 +11,7 @@ interface GhostToastProps {
 
 export function GhostToast({ company, days, onAccept, onDismiss }: GhostToastProps) {
   return (
-    <div className="flex items-start gap-3 bg-[#1c1b19] border border-[#2d2b27] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] px-4 py-3.5 w-[320px]">
+    <div className="flex items-start gap-3 bg-[#1c1b19] border border-[#2d2b27] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.5)] px-4 py-3.5 w-full sm:w-[320px]">
       <div className="w-8 h-8 rounded-xl bg-[#252320] flex items-center justify-center shrink-0 mt-0.5">
         <Ghost className="w-3.5 h-3.5 text-[#6b6762]" />
       </div>

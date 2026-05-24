@@ -4,16 +4,17 @@ import { useState } from "react";
 import { ChevronUp, ChevronDown, Star, Calendar, ChevronsUpDown, MoreHorizontal, Ghost, XCircle, Pencil, Trash2 } from "lucide-react";
 import { cn, formatDate, isOverdue } from "@/lib/utils";
 import { STAGE_MAP } from "@/lib/stages";
-import type { Application } from "@/lib/mock-data";
+import type { ApplicationView } from "@/lib/types";
 
 type SortKey = "company" | "stage" | "dateApplied" | "followUpDate" | "salaryRange" | "source";
 type SortDir  = "asc" | "desc";
 
 interface TableViewProps {
-  applications:   Application[];
-  onRowClick:     (app: Application) => void;
-  onStageChange?: (id: string, stage: Application["stage"]) => void;
+  applications:   ApplicationView[];
+  onRowClick:     (app: ApplicationView) => void;
+  onStageChange?: (id: string, stage: ApplicationView["stage"]) => void;
   onDelete?:      (id: string) => void;
+  onStarToggle?:  (app: ApplicationView) => void;
 }
 
 const PAGE_SIZE = 15;
@@ -32,7 +33,7 @@ const STAGE_CHIP: Record<string, string> = {
   ghosted:   "bg-zinc-800/30 text-zinc-500",
 };
 
-function sortApps(apps: Application[], key: SortKey, dir: SortDir): Application[] {
+function sortApps(apps: ApplicationView[], key: SortKey, dir: SortDir): ApplicationView[] {
   return [...apps].sort((a, b) => {
     let av: string | number = "";
     let bv: string | number = "";
@@ -50,7 +51,7 @@ function sortApps(apps: Application[], key: SortKey, dir: SortDir): Application[
 
 /* ── Row action menu ──────────────────────────────────────────────────── */
 function ActionMenu({ app, onEdit, onGhost, onReject, onDelete }: {
-  app: Application; onEdit: () => void; onGhost: () => void; onReject: () => void; onDelete: () => void;
+  app: ApplicationView; onEdit: () => void; onGhost: () => void; onReject: () => void; onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -88,7 +89,7 @@ function ActionMenu({ app, onEdit, onGhost, onReject, onDelete }: {
 }
 
 /* ── Main ─────────────────────────────────────────────────────────────── */
-export function TableView({ applications, onRowClick, onStageChange, onDelete }: TableViewProps) {
+export function TableView({ applications, onRowClick, onStageChange, onDelete, onStarToggle }: TableViewProps) {
   const [sortKey, setSortKey] = useState<SortKey>("dateApplied");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page,    setPage]    = useState(1);
@@ -124,8 +125,87 @@ export function TableView({ applications, onRowClick, onStageChange, onDelete }:
   ];
 
   return (
-    <div className="px-5 py-4">
-      <div className="bg-[#1c1b19] border border-[#2d2b27] rounded-xl overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.2)]">
+    <div className="px-3 sm:px-5 py-4 pb-24 sm:pb-4">
+      <div className="sm:hidden space-y-2">
+        {paginated.length === 0 && (
+          <div className="px-4 py-16 text-center text-[12px] text-[#6b6762] border border-[#2d2b27] rounded-xl bg-[#1c1b19]">
+            No applications match your filters
+          </div>
+        )}
+        {paginated.map((app) => {
+          const stageInfo = STAGE_MAP[app.stage];
+          const overdue = isOverdue(app.followUpDate);
+          const companyLabel = app.company || "Untitled application";
+          const roleLabel = app.roleTitle || "No role title";
+          return (
+            <button
+              key={app.id}
+              onClick={() => onRowClick(app)}
+              className="w-full text-left bg-[#1c1b19] border border-[#2d2b27] rounded-xl p-3"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-[#f0ede8] text-sm truncate">{companyLabel}</p>
+                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", stageInfo?.dot)} />
+                  </div>
+                  <p className="text-xs text-[#6b6762] truncate mt-0.5">{roleLabel}</p>
+                </div>
+                <span className={cn("text-[10px] font-semibold px-2 py-1 rounded-md shrink-0", STAGE_CHIP[app.stage])}>
+                  {stageInfo?.label}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[#6b6762]">
+                {app.dateApplied && <span>Applied {formatDate(app.dateApplied)}</span>}
+                {app.followUpDate && (
+                  <span className={cn("inline-flex items-center gap-1", overdue && "text-red-400")}>
+                    <Calendar className="w-3 h-3" />
+                    {formatDate(app.followUpDate)}
+                  </span>
+                )}
+                {app.source && <span>{SOURCE_LABELS[app.source]}</span>}
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onStarToggle?.(app);
+                  }}
+                  className="min-h-10 min-w-10 rounded-lg border border-[#2d2b27] flex items-center justify-center"
+                  aria-label={app.isStarred ? "Unstar application" : "Star application"}
+                >
+                  <Star className={cn("w-4 h-4", app.isStarred ? "text-orange-400 fill-orange-400" : "text-[#6b6762]")} />
+                </button>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onStageChange?.(app.id, "ghosted");
+                    }}
+                    className="h-10 px-3 rounded-lg border border-[#2d2b27] text-xs text-[#a8a49e]"
+                  >
+                    Ghost
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete?.(app.id);
+                    }}
+                    className="h-10 px-3 rounded-lg border border-red-900/50 text-xs text-red-400"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="hidden sm:block bg-[#1c1b19] border border-[#2d2b27] rounded-xl overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.2)]">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px] text-[12px]">
 
@@ -158,6 +238,8 @@ export function TableView({ applications, onRowClick, onStageChange, onDelete }:
               {paginated.map((app) => {
                 const stageInfo = STAGE_MAP[app.stage];
                 const overdue   = isOverdue(app.followUpDate);
+                const companyLabel = app.company || "Untitled application";
+                const roleLabel = app.roleTitle || "No role title";
                 return (
                   <tr key={app.id} onClick={() => onRowClick(app)}
                     className="group cursor-pointer hover:bg-[#232220] transition-colors duration-100">
@@ -171,11 +253,11 @@ export function TableView({ applications, onRowClick, onStageChange, onDelete }:
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-lg bg-orange-950 flex items-center justify-center shrink-0">
-                          <span className="text-[9px] font-bold text-orange-400">{app.company.slice(0, 2).toUpperCase()}</span>
+                          <span className="text-[9px] font-bold text-orange-400">{companyLabel.slice(0, 2).toUpperCase()}</span>
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold text-[#f0ede8] truncate tracking-[-0.01em]">{app.company}</p>
-                          <p className="text-[11px] text-[#6b6762] truncate mt-0.5">{app.roleTitle}</p>
+                          <p className="font-semibold text-[#f0ede8] truncate tracking-[-0.01em]">{companyLabel}</p>
+                          <p className="text-[11px] text-[#6b6762] truncate mt-0.5">{roleLabel}</p>
                         </div>
                       </div>
                     </td>

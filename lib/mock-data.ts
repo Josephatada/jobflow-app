@@ -1,31 +1,15 @@
-import type { Stage, Source } from "@prisma/client";
+import type { ApplicationView, InterviewRoundView } from "@/lib/types";
 
-export type Application = {
-  id: string;
-  company: string;
-  roleTitle: string;
-  jobUrl: string | null;
-  location: string | null;
-  source: Source | null;
-  dateApplied: Date | null;
-  contactName: string | null;
-  contactEmail: string | null;
-  salaryRange: string | null;
-  stage: Stage;
-  followUpDate: Date | null;
-  isStarred: boolean;
-  notes: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  interviewRounds: InterviewRound[];
+export type InterviewRound = Omit<InterviewRoundView, "date" | "createdAt"> & {
+  date: Date | string | null;
+  createdAt: Date | string;
 };
-
-export type InterviewRound = {
-  id: string;
-  applicationId: string;
-  label: string;
-  date: Date | null;
-  createdAt: Date;
+export type Application = Omit<ApplicationView, "dateApplied" | "followUpDate" | "createdAt" | "updatedAt" | "interviewRounds"> & {
+  dateApplied: Date | string | null;
+  followUpDate: Date | string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  interviewRounds: InterviewRound[];
 };
 
 export const MOCK_APPLICATIONS: Application[] = [

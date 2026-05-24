@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Search, Star, X, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Source } from "@prisma/client";
@@ -49,6 +50,7 @@ const chipIdle   = "bg-[#1c1b19] border-[#2d2b27] text-[#a8a49e] hover:border-[#
 const chipActive = "bg-orange-950/40 border-orange-900/50 text-orange-400";
 
 export function FilterBar({ filters, onChange, searchRef }: FilterBarProps) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const hasActive =
     filters.search || filters.source || filters.starredOnly || filters.dateRange !== "all";
 
@@ -57,10 +59,10 @@ export function FilterBar({ filters, onChange, searchRef }: FilterBarProps) {
   }
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className="flex w-full sm:w-auto items-center gap-1.5 flex-wrap">
 
       {/* Search */}
-      <div className="relative">
+      <div className="relative flex-1 sm:flex-none">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#6b6762] pointer-events-none" />
         <input
           ref={searchRef}
@@ -73,7 +75,7 @@ export function FilterBar({ filters, onChange, searchRef }: FilterBarProps) {
             "text-[#f0ede8] placeholder:text-[#6b6762]",
             "focus:outline-none focus:ring-2 focus:ring-orange-600/30 focus:border-orange-600/50 focus:bg-[#1c1b19]",
             "transition-all duration-150 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
-            "w-[180px] focus:w-[220px]"
+            "w-full sm:w-[180px] sm:focus:w-[220px]"
           )}
         />
         {filters.search && (
@@ -86,8 +88,20 @@ export function FilterBar({ filters, onChange, searchRef }: FilterBarProps) {
         )}
       </div>
 
+      <button
+        type="button"
+        onClick={() => setFiltersOpen((open) => !open)}
+        className={cn(chipBase, "sm:hidden", hasActive ? chipActive : chipIdle)}
+        aria-expanded={filtersOpen}
+      >
+        <SlidersHorizontal className="w-3 h-3" />
+        Filters
+      </button>
+
       {/* Divider */}
-      <span className="w-px h-4 bg-[#2d2b27] shrink-0" />
+      <span className="hidden sm:block w-px h-4 bg-[#2d2b27] shrink-0" />
+
+      <div className={cn("w-full sm:w-auto sm:flex flex-wrap items-center gap-1.5", filtersOpen ? "flex" : "hidden")}>
 
       {/* Source */}
       <select
@@ -137,6 +151,7 @@ export function FilterBar({ filters, onChange, searchRef }: FilterBarProps) {
           Clear
         </button>
       )}
+      </div>
     </div>
   );
 }

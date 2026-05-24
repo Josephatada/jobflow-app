@@ -4,7 +4,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { Plus } from "lucide-react";
 import { DraggableCard } from "./DraggableCard";
 import { cn } from "@/lib/utils";
-import type { Application } from "@/lib/mock-data";
+import type { ApplicationView } from "@/lib/types";
 import type { Stage } from "@prisma/client";
 
 interface DroppableColumnProps {
@@ -12,8 +12,10 @@ interface DroppableColumnProps {
   label:        string;
   color:        string;
   dot:          string;
-  applications: Application[];
-  onCardClick:  (app: Application) => void;
+  applications: ApplicationView[];
+  onCardClick:  (app: ApplicationView) => void;
+  onStarToggle?: (app: ApplicationView) => void;
+  registerColumn?: (stage: Stage, node: HTMLDivElement | null) => void;
   onAdd:        (stage: Stage) => void;
 }
 
@@ -26,11 +28,20 @@ const DOT_COLORS: Record<string, string> = {
   ghosted:   "bg-zinc-600",
 };
 
-export function DroppableColumn({ slug, label, applications, onCardClick, onAdd }: DroppableColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: slug });
+export function DroppableColumn({ slug, label, applications, onCardClick, onStarToggle, registerColumn, onAdd }: DroppableColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `column-${slug}`,
+    data: {
+      type: "column",
+      stage: slug,
+    },
+  });
 
   return (
-    <div className="flex flex-col w-[260px] shrink-0">
+    <div
+      ref={(node) => registerColumn?.(slug, node)}
+      className="flex flex-col w-full sm:w-[260px] shrink-0"
+    >
       {/* Column header */}
       <div className="flex items-center justify-between mb-2.5 px-0.5">
         <div className="flex items-center gap-2">
@@ -64,6 +75,7 @@ export function DroppableColumn({ slug, label, applications, onCardClick, onAdd 
               key={app.id}
               application={app}
               onClick={() => onCardClick(app)}
+              onStarToggle={onStarToggle}
             />
           ))}
 
