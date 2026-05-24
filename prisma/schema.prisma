@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Stage {
+  wishlist
+  applied
+  interview
+  offer
+  rejected
+  ghosted
+}
+
+enum Source {
+  linkedin
+  referral
+  company_site
+  job_board
+  other
+}
+
+model Application {
+  id              String           @id @default(cuid())
+  company         String
+  roleTitle       String
+  jobUrl          String?
+  location        String?
+  source          Source?
+  dateApplied     DateTime?
+  contactName     String?
+  contactEmail    String?
+  salaryRange     String?
+  stage           Stage            @default(wishlist)
+  followUpDate    DateTime?
+  isStarred       Boolean          @default(false)
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  stageHistory    StageHistory[]
+  interviewRounds InterviewRound[]
+}
+
+model StageHistory {
+  id            String      @id @default(cuid())
+  applicationId String
+  fromStage     Stage?
+  toStage       Stage
+  changedAt     DateTime    @default(now())
+
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
+
+model InterviewRound {
+  id            String      @id @default(cuid())
+  applicationId String
+  label         String
+  date          DateTime?
+  createdAt     DateTime    @default(now())
+
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}

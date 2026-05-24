@@ -1,0 +1,168 @@
+import type { Stage, Source } from "@prisma/client";
+
+export type Application = {
+  id: string;
+  company: string;
+  roleTitle: string;
+  jobUrl: string | null;
+  location: string | null;
+  source: Source | null;
+  dateApplied: Date | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  salaryRange: string | null;
+  stage: Stage;
+  followUpDate: Date | null;
+  isStarred: boolean;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  interviewRounds: InterviewRound[];
+};
+
+export type InterviewRound = {
+  id: string;
+  applicationId: string;
+  label: string;
+  date: Date | null;
+  createdAt: Date;
+};
+
+export const MOCK_APPLICATIONS: Application[] = [
+  {
+    id: "1",
+    company: "Stripe",
+    roleTitle: "Senior Frontend Engineer",
+    jobUrl: "https://stripe.com/jobs",
+    location: "Remote",
+    source: "linkedin",
+    dateApplied: new Date("2026-05-01"),
+    contactName: "Sarah Chen",
+    contactEmail: "sarah@stripe.com",
+    salaryRange: "$180k–$220k",
+    stage: "interview",
+    followUpDate: new Date("2026-05-20"),
+    isStarred: true,
+    notes: "Great culture fit. Spoke with Sarah about the team structure.",
+    createdAt: new Date("2026-05-01"),
+    updatedAt: new Date("2026-05-15"),
+    interviewRounds: [
+      { id: "r1", applicationId: "1", label: "Phone Screen", date: new Date("2026-05-08"), createdAt: new Date("2026-05-08") },
+      { id: "r2", applicationId: "1", label: "Technical", date: new Date("2026-05-15"), createdAt: new Date("2026-05-15") },
+    ],
+  },
+  {
+    id: "2",
+    company: "Linear",
+    roleTitle: "Product Designer",
+    jobUrl: "https://linear.app/jobs",
+    location: "San Francisco, CA",
+    source: "company_site",
+    dateApplied: new Date("2026-05-10"),
+    contactName: null,
+    contactEmail: null,
+    salaryRange: "$150k–$180k",
+    stage: "applied",
+    followUpDate: new Date("2026-05-20"),
+    isStarred: true,
+    notes: null,
+    createdAt: new Date("2026-05-10"),
+    updatedAt: new Date("2026-05-10"),
+    interviewRounds: [],
+  },
+  {
+    id: "3",
+    company: "Vercel",
+    roleTitle: "Developer Advocate",
+    jobUrl: "https://vercel.com/careers",
+    location: "Remote",
+    source: "other",
+    dateApplied: null,
+    contactName: null,
+    contactEmail: null,
+    salaryRange: null,
+    stage: "wishlist",
+    followUpDate: null,
+    isStarred: false,
+    notes: null,
+    createdAt: new Date("2026-05-18"),
+    updatedAt: new Date("2026-05-18"),
+    interviewRounds: [],
+  },
+  {
+    id: "4",
+    company: "Notion",
+    roleTitle: "Full Stack Engineer",
+    jobUrl: "https://notion.so/jobs",
+    location: "New York, NY",
+    source: "referral",
+    dateApplied: new Date("2026-05-12"),
+    contactName: "Marcus Liu",
+    contactEmail: null,
+    salaryRange: "$160k–$190k",
+    stage: "applied",
+    followUpDate: null,
+    isStarred: false,
+    notes: "Referred by Marcus from college.",
+    createdAt: new Date("2026-05-12"),
+    updatedAt: new Date("2026-05-12"),
+    interviewRounds: [],
+  },
+  {
+    id: "5",
+    company: "Figma",
+    roleTitle: "Software Engineer, Platform",
+    jobUrl: null,
+    location: "San Francisco, CA",
+    source: "linkedin",
+    dateApplied: new Date("2026-04-20"),
+    contactName: null,
+    contactEmail: null,
+    salaryRange: null,
+    stage: "rejected",
+    followUpDate: null,
+    isStarred: false,
+    notes: "Rejected after technical round.",
+    createdAt: new Date("2026-04-20"),
+    updatedAt: new Date("2026-05-05"),
+    interviewRounds: [],
+  },
+  {
+    id: "6",
+    company: "Loom",
+    roleTitle: "React Native Engineer",
+    jobUrl: null,
+    location: "Remote",
+    source: "job_board",
+    dateApplied: new Date("2026-04-10"),
+    contactName: null,
+    contactEmail: null,
+    salaryRange: null,
+    stage: "ghosted",
+    followUpDate: null,
+    isStarred: false,
+    notes: null,
+    createdAt: new Date("2026-04-10"),
+    updatedAt: new Date("2026-04-10"),
+    interviewRounds: [],
+  },
+  {
+    id: "7",
+    company: "Anthropic",
+    roleTitle: "Product Engineer",
+    jobUrl: "https://anthropic.com/careers",
+    location: "San Francisco, CA",
+    source: "referral",
+    dateApplied: new Date("2026-04-28"),
+    contactName: "Jamie Park",
+    contactEmail: "jamie@anthropic.com",
+    salaryRange: "$200k–$250k",
+    stage: "offer",
+    followUpDate: new Date("2026-05-25"),
+    isStarred: true,
+    notes: "Offer received! Negotiating equity.",
+    createdAt: new Date("2026-04-28"),
+    updatedAt: new Date("2026-05-20"),
+    interviewRounds: [],
+  },
+];
