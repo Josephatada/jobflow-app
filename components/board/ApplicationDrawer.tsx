@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { X, Star, Trash2, ExternalLink, Copy, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Star, Trash2, ExternalLink, Copy, Check, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -69,7 +69,7 @@ export function ApplicationDrawer({
     application ?? emptyApp(defaultStage)
   );
   const [copied, setCopied] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [errors, setErrors] = useState<{ jobUrl?: string }>({});
 
   function set<K extends keyof ApplicationView>(key: K, value: ApplicationView[K]) {
@@ -89,8 +89,7 @@ export function ApplicationDrawer({
     onClose();
   }
 
-  function handleDelete() {
-    if (!confirmDelete) { setConfirmDelete(true); return; }
+  function handleDeleteConfirmed() {
     onDelete(form.id);
     onClose();
   }
@@ -113,7 +112,8 @@ export function ApplicationDrawer({
   const stageInfo = STAGES.find((s) => s.slug === form.stage);
 
   return (
-    /* Backdrop */
+    <>
+    {/* Backdrop */}
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
@@ -376,15 +376,13 @@ export function ApplicationDrawer({
         {/* Footer */}
         <div className="border-t border-[#2d2b27] px-4 sm:px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex items-center justify-between shrink-0">
           {!isNew ? (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={handleDelete}
-              className="gap-1.5"
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-950/40 hover:text-red-300 transition-all duration-150"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              {confirmDelete ? "Confirm delete" : "Delete"}
-            </Button>
+              <Trash2 className="w-3.5 h-3.5 shrink-0" />
+              Delete
+            </button>
           ) : (
             <div />
           )}
@@ -396,6 +394,81 @@ export function ApplicationDrawer({
               {isNew ? "Add application" : "Save changes"}
             </Button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Delete confirmation modal — rendered above the drawer (z-[60]) */}
+    {showDeleteModal && (
+      <DeleteConfirmModal
+        companyName={form.company || "this application"}
+        onConfirm={handleDeleteConfirmed}
+        onCancel={() => setShowDeleteModal(false)}
+      />
+    )}
+    </>
+  );
+}
+
+// ── Delete confirmation modal ────────────────────────────────────────────────
+
+interface DeleteConfirmModalProps {
+  companyName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function DeleteConfirmModal({ companyName, onConfirm, onCancel }: DeleteConfirmModalProps) {
+  // Close on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-[#1c1b19] border border-[#2d2b27] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.7)] w-full max-w-[380px] mx-4 animate-[fadeScaleIn_0.15s_cubic-bezier(0.16,1,0.3,1)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Icon + heading */}
+        <div className="flex flex-col items-center text-center px-6 pt-7 pb-5">
+          <div className="w-11 h-11 rounded-full bg-red-950/60 border border-red-900/40 flex items-center justify-center mb-4">
+            <AlertTriangle className="w-5 h-5 text-red-400" />
+          </div>
+          <h2 className="text-[15px] font-semibold text-[#f0ede8] leading-snug">
+            Delete application?
+          </h2>
+          <p className="text-[13px] text-[#6b6762] mt-1.5 leading-relaxed">
+            <span className="text-[#a8a49e] font-medium">{companyName}</span> will be permanently
+            removed. This cannot be undone.
+          </p>
+        </div>
+
+        {/* Divider */}
+        <div className="h-px bg-[#2d2b27] mx-0" />
+
+        {/* Actions */}
+        <div className="flex gap-2 px-5 py-4">
+          <button
+            onClick={onCancel}
+            className="flex-1 h-9 rounded-lg border border-[#2d2b27] text-[13px] font-semibold text-[#a8a49e] hover:bg-[#252320] hover:text-[#f0ede8] transition-all duration-150"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 h-9 rounded-lg bg-red-700 text-[13px] font-semibold text-white hover:bg-red-600 transition-all duration-150 shadow-[0_1px_3px_rgba(185,28,28,0.4)]"
+            autoFocus
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>

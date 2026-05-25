@@ -1,0 +1,27 @@
+# Build output
+.next/
+out/
+build/
+dist/
+
+# Dependencies — never index these
+node_modules/
+
+# Prisma generated
+app/generated/
+prisma/migrations/
+
+# Locks (large, no value to index)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# OS
+.DS_Store

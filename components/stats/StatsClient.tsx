@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  BarChart, Bar,
 } from "recharts";
 import {
   filterByRange, byStage, responseRate, weeklyVolume,
@@ -57,17 +56,23 @@ export function StatsClient({ applications }: { applications: ApplicationView[] 
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-center sm:justify-between gap-2 px-4 sm:px-5 min-h-[64px] sm:h-[52px] border-b border-[#2d2b27] bg-[#1c1b19] shrink-0">
+      <div className="flex items-center px-5 h-[52px] border-b border-[#2d2b27] bg-[#1c1b19] shrink-0">
         <h1 className="text-[13px] font-semibold text-[#f0ede8] tracking-[-0.01em]">Stats</h1>
-        <div className="flex items-center gap-1 bg-[#252320] rounded-lg p-1">
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4 space-y-4 pb-24 sm:pb-4">
+
+        {/* Date range filter */}
+        <div className="flex items-center gap-1 bg-[#252320] rounded-lg p-0.5 w-fit">
           {DATE_RANGES.map((r) => (
             <button
               key={r.value}
               onClick={() => setRange(r.value)}
               className={cn(
-                "px-2 sm:px-3 h-7 text-xs font-medium rounded-md transition-colors",
+                "px-2.5 h-7 text-[11px] font-medium rounded-md transition-all duration-150 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] whitespace-nowrap",
                 range === r.value
-                  ? "bg-[#333028] text-[#f0ede8] shadow-sm"
+                  ? "bg-[#333028] text-[#f0ede8] shadow-[0_1px_3px_rgba(0,0,0,0.3)]"
                   : "text-[#6b6762] hover:text-[#a8a49e]"
               )}
             >
@@ -75,10 +80,6 @@ export function StatsClient({ applications }: { applications: ApplicationView[] 
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-4 space-y-4 pb-24 sm:pb-4">
 
         {/* KPI row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
@@ -157,18 +158,39 @@ export function StatsClient({ applications }: { applications: ApplicationView[] 
         {/* Charts row 2 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ChartCard title="Top sources">
-            {sources.length && mounted ? (
-              <div className="w-full" style={{ height: 200 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sources} layout="vertical" margin={{ top: 0, right: 8, bottom: 0, left: 60 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2d2b27" horizontal={false} />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: "#6b6762" }} />
-                  <YAxis type="category" dataKey="source" tick={{ fontSize: 11, fill: "#6b6762" }} width={60} />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #2d2b27", background: "#1c1b19", fontSize: 12, color: "#f0ede8" }} />
-                  <Bar dataKey="applied" name="Applied" fill="#1e3a5f" radius={[0, 4, 4, 0]} />
-                  <Bar dataKey="interview" name="Interview" fill="#e8510a" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            {sources.length ? (
+              <div className="flex flex-col gap-3">
+                {sources.map((s) => {
+                  const max = sources[0].applied || 1;
+                  const appliedPct = Math.round((s.applied / max) * 100);
+                  const interviewPct = Math.round((s.interview / max) * 100);
+                  return (
+                    <div key={s.source} className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-[#a8a49e] capitalize">{s.source}</span>
+                        <span className="text-[11px] text-[#6b6762] tabular-nums">{s.applied} applied · {s.interview} interviews</span>
+                      </div>
+                      <div className="relative h-2 bg-[#252320] rounded-full overflow-hidden">
+                        <div
+                          className="absolute inset-y-0 left-0 bg-blue-900 rounded-full"
+                          style={{ width: `${appliedPct}%` }}
+                        />
+                        <div
+                          className="absolute inset-y-0 left-0 bg-orange-500 rounded-full"
+                          style={{ width: `${interviewPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="flex items-center gap-1.5 text-[10px] text-[#6b6762]">
+                    <span className="w-2 h-2 rounded-full bg-blue-900 shrink-0" /> Applied
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-[#6b6762]">
+                    <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" /> Interview+
+                  </span>
+                </div>
               </div>
             ) : <p className="text-sm text-[#6b6762] py-8 text-center">No data</p>}
           </ChartCard>

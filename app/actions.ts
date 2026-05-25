@@ -50,7 +50,14 @@ function parseRounds(rounds: InterviewRoundView[] | undefined) {
 }
 
 function revalidateApp() {
-  revalidatePath("/board");
+  // NOTE: /board is intentionally NOT revalidated here.
+  // The board page manages its own state via optimistic updates + server action
+  // return values. Revalidating /board would cause Next.js to refetch the RSC
+  // payload and remount the KanbanBoard client component, resetting useState to
+  // initialApplications — which creates a visible undo→redo flicker as the old
+  // server data briefly overrides the optimistic state before the action result
+  // arrives. The board will get fresh data on next hard navigation anyway
+  // (force-dynamic ensures no caching).
   revalidatePath("/summary");
   revalidatePath("/stats");
   revalidatePath("/settings");

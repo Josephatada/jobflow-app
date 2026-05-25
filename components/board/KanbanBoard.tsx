@@ -1,13 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect, useRef } from "react";
-import {
-  DndContext, DragOverlay, PointerSensor, closestCorners,
-  useSensor, useSensors, type DragEndEvent, type DragStartEvent,
-} from "@dnd-kit/core";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Plus, LayoutGrid, List } from "lucide-react";
 import { DroppableColumn } from "./DroppableColumn";
-import { ApplicationCard } from "./ApplicationCard";
 import { ApplicationDrawer } from "./ApplicationDrawer";
 import { GhostToast } from "./GhostToast";
 import { FilterBar, DEFAULT_FILTERS, type Filters } from "./FilterBar";
@@ -35,41 +30,21 @@ type ViewMode = "kanban" | "table";
 
 function applyFilters(apps: ApplicationView[], filters: Filters): ApplicationView[] {
   const now = Date.now();
-  const cutoff = filters.dateRange === "30d" ? now - 30 * 86400000 : filters.dateRange === "90d" ? now - 90 * 86400000 : 0;
+  const cutoff =
+    filters.dateRange === "30d"
+      ? now - 30 * 86400000
+      : filters.dateRange === "90d"
+      ? now - 90 * 86400000
+      : 0;
   const q = filters.search.toLowerCase();
   return apps.filter((a) => {
     if (filters.starredOnly && !a.isStarred) return false;
     if (filters.source && a.source !== filters.source) return false;
     if (cutoff && new Date(a.createdAt).getTime() < cutoff) return false;
-    if (q && !a.company.toLowerCase().includes(q) && !a.roleTitle.toLowerCase().includes(q)) return false;
+    if (q && !a.company.toLowerCase().includes(q) && !a.roleTitle.toLowerCase().includes(q))
+      return false;
     return true;
   });
-}
-
-function getDropStage(event: DragEndEvent): Stage | null {
-  const over = event.over;
-  if (!over) return null;
-  const stage = over.data.current?.stage;
-  if (typeof stage === "string") return stage as Stage;
-  if (typeof over.id === "string" && over.id.startsWith("column-")) {
-    return over.id.replace("column-", "") as Stage;
-  }
-  return null;
-}
-
-function getEventPointer(event: Event, delta?: { x: number; y: number }) {
-  const offset = delta ?? { x: 0, y: 0 };
-  if ("clientX" in event && "clientY" in event) {
-    return {
-      x: Number(event.clientX) + offset.x,
-      y: Number(event.clientY) + offset.y,
-    };
-  }
-  if ("changedTouches" in event) {
-    const touch = (event as TouchEvent).changedTouches[0];
-    if (touch) return { x: touch.clientX + offset.x, y: touch.clientY + offset.y };
-  }
-  return null;
 }
 
 export function KanbanBoard({
@@ -85,26 +60,17 @@ export function KanbanBoard({
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [view, setView] = useState<ViewMode>("kanban");
   const [drawer, setDrawer] = useState<DrawerState>({ mode: "closed" });
-  const [draggingApp, setDraggingApp] = useState<ApplicationView | null>(null);
   const [snoozedIds, setSnoozedIds] = useState(() => new Set(snoozedApplicationIds));
   const [activeMobileStage, setActiveMobileStage] = useState<Stage>("wishlist");
   const [error, setError] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
-  const columnRefs = useRef(new Map<Stage, HTMLDivElement>());
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-
-  const registerColumn = useCallback((stage: Stage, node: HTMLDivElement | null) => {
-    if (node) columnRefs.current.set(stage, node);
-    else columnRefs.current.delete(stage);
-  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (e.key === "/" ) { e.preventDefault(); searchRef.current?.focus(); }
+      if (e.key === "/") { e.preventDefault(); searchRef.current?.focus(); }
       if (e.key === "n" || e.key === "N") { e.preventDefault(); setDrawer({ mode: "new", stage: "wishlist" }); }
     }
     window.addEventListener("keydown", onKey);
@@ -119,106 +85,169 @@ export function KanbanBoard({
   const currentToast = ghostQueue[0] ?? null;
 
   const grouped = STAGES.reduce<Record<Stage, ApplicationView[]>>(
-    (acc, s) => { acc[s.slug] = filtered.filter((a) => a.stage === s.slug); return acc; },
+    (acc, s) => {
+      acc[s.slug] = filtered.filter((a) => a.stage === s.slug);
+      return acc;
+    },
     {} as Record<Stage, ApplicationView[]>
   );
 
-  const overdueCount = applications.filter((a) => a.followUpDate && new Date(a.followUpDate) < new Date()).length;
-  const activeCount = applications.filter((a) => ["applied", "interview", "offer"].includes(a.stage)).length;
+  const overdueCount = applications.filter(
+    (a) => a.followUpDate && new Date(a.followUpDate) < new Date()
+  ).length;
+  const activeCount = applications.filter((a) =>
+    ["applied", "interview", "offer"].includes(a.stage)
+  ).length;
 
-  function handleDragStart(e: DragStartEvent) {
-    setDraggingApp(applications.find((a) => a.id === e.active.id) ?? null);
+  // ─── Drag handlers ────────────────────────────────────────────────────────
+
+  // No drag state needed — DraggableCard manages its own opacity.
+  // KanbanBoard only handles the drop.
+
+  function handleDragStart(_id: string) {
+    // Nothing needed at the board level for native HTML5 DnD.
+    // Each card manages its own visual opacity via a ref.
   }
-  async function handleDragEnd(e: DragEndEvent) {
-    setDraggingApp(null);
-    const { active } = e;
-    const newStage = getPointerDropStage(e) ?? getDropStage(e);
-    if (!newStage) return;
-    const app = applications.find((a) => a.id === active.id);
-    if (!app || app.stage === newStage) return;
-    await handleStageChange(app.id, newStage);
+
+  function handleDragEnd() {
+    // Nothing needed. Card resets its own opacity in onDragEnd.
   }
-  async function handleSave(app: ApplicationView) {
-    const previous = applications;
-    setApplications((prev) => {
-      const exists = prev.find((a) => a.id === app.id);
-      return exists ? prev.map((a) => a.id === app.id ? app : a) : [{ ...app, id: app.id || crypto.randomUUID() }, ...prev];
-    });
-    const result = await saveApplicationAction(app);
+
+  async function handleDrop(cardId: string, targetStage: Stage) {
+    // Find the card in current state
+    const card = applications.find((a) => a.id === cardId);
+    if (!card) return;
+    if (card.stage === targetStage) return; // dropped on same column — no-op
+
+    // Snapshot for rollback
+    const snapshot = [...applications];
+
+    // Optimistic update
+    setApplications((prev) =>
+      prev.map((a) =>
+        a.id === cardId
+          ? { ...a, stage: targetStage, updatedAt: new Date().toISOString() }
+          : a
+      )
+    );
+    setError("");
+
+    // Sync to server
+    const result = await changeStageAction(cardId, targetStage);
     if (result.ok) {
-      setApplications((prev) => {
-        const withoutTemp = prev.filter((a) => a.id !== app.id);
-        const exists = previous.some((a) => a.id === app.id);
-        return exists
-          ? prev.map((a) => a.id === app.id ? result.data : a)
-          : [result.data, ...withoutTemp];
-      });
-      setError("");
+      // Replace optimistic record with authoritative server data
+      setApplications((prev) => prev.map((a) => (a.id === cardId ? result.data : a)));
     } else {
-      setApplications(previous);
+      // Server rejected — restore snapshot
+      setApplications(snapshot);
       setError(result.error);
     }
   }
+
+  // ─── CRUD handlers ────────────────────────────────────────────────────────
+
+  async function handleSave(app: ApplicationView) {
+    // Use the same "new-" prefix check the server uses — avoids any stale-closure
+    // ambiguity about whether this is a create or an update.
+    const isNew = app.id.startsWith("new-");
+    const tempId = app.id;
+
+    if (isNew) {
+      // ── Create ───────────────────────────────────────────────────
+      // Add optimistic record using the temp id so it appears instantly.
+      setApplications((prev) => [{ ...app }, ...prev]);
+
+      const result = await saveApplicationAction(app);
+      if (result.ok) {
+        // Swap the temp record out for the real server record.
+        setApplications((prev) => [
+          result.data,
+          ...prev.filter((a) => a.id !== tempId),
+        ]);
+        setError("");
+      } else {
+        // Remove the optimistic record — creation failed.
+        setApplications((prev) => prev.filter((a) => a.id !== tempId));
+        setError(result.error);
+      }
+    } else {
+      // ── Update ───────────────────────────────────────────────────
+      // Snapshot only the single record being edited so we can revert it.
+      const original = applications.find((a) => a.id === app.id);
+
+      setApplications((prev) => prev.map((a) => (a.id === app.id ? app : a)));
+
+      const result = await saveApplicationAction(app);
+      if (result.ok) {
+        setApplications((prev) => prev.map((a) => (a.id === app.id ? result.data : a)));
+        setError("");
+      } else {
+        // Revert only this record; leave everything else untouched.
+        if (original) {
+          setApplications((prev) => prev.map((a) => (a.id === app.id ? original : a)));
+        }
+        setError(result.error);
+      }
+    }
+  }
+
   async function handleDelete(id: string) {
-    const previous = applications;
+    const snapshot = [...applications];
     setApplications((prev) => prev.filter((a) => a.id !== id));
     const result = await deleteApplicationAction(id);
     if (!result.ok) {
-      setApplications(previous);
+      setApplications(snapshot);
       setError(result.error);
     }
   }
+
   async function handleStageChange(id: string, stage: Stage) {
-    const previous = applications;
-    setApplications((prev) => prev.map((a) => a.id === id ? { ...a, stage, updatedAt: new Date().toISOString() } : a));
+    const snapshot = [...applications];
+    setApplications((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, stage, updatedAt: new Date().toISOString() } : a))
+    );
     const result = await changeStageAction(id, stage);
     if (result.ok) {
-      setApplications((prev) => prev.map((a) => a.id === id ? result.data : a));
+      setApplications((prev) => prev.map((a) => (a.id === id ? result.data : a)));
       setError("");
     } else {
-      setApplications(previous);
+      setApplications(snapshot);
       setError(result.error);
     }
   }
+
   async function handleStarToggle(app: ApplicationView) {
-    const previous = applications;
+    const snapshot = [...applications];
     const nextStarred = !app.isStarred;
-    setApplications((prev) => prev.map((a) => a.id === app.id ? { ...a, isStarred: nextStarred } : a));
+    setApplications((prev) =>
+      prev.map((a) => (a.id === app.id ? { ...a, isStarred: nextStarred } : a))
+    );
     const result = await toggleStarAction(app.id, nextStarred);
     if (result.ok) {
-      setApplications((prev) => prev.map((a) => a.id === app.id ? result.data : a));
+      setApplications((prev) => prev.map((a) => (a.id === app.id ? result.data : a)));
       setError("");
     } else {
-      setApplications(previous);
+      setApplications(snapshot);
       setError(result.error);
     }
   }
+
   async function handleGhostAccept(app: ApplicationView) {
     await handleStageChange(app.id, "ghosted");
   }
+
   async function handleGhostSnooze(app: ApplicationView) {
     setSnoozedIds((prev) => new Set(prev).add(app.id));
     const result = await snoozeGhostAction(app.id);
     if (!result.ok) setError(result.error);
   }
 
-  function getPointerDropStage(event: DragEndEvent): Stage | null {
-    const pointer = getEventPointer(event.activatorEvent, event.delta);
-    if (!pointer) return null;
-    for (const stage of STAGES) {
-      const node = columnRefs.current.get(stage.slug);
-      if (!node) continue;
-      const rect = node.getBoundingClientRect();
-      if (
-        pointer.x >= rect.left &&
-        pointer.x <= rect.right &&
-        pointer.y >= rect.top &&
-        pointer.y <= rect.bottom
-      ) {
-        return stage.slug;
-      }
-    }
-    return null;
+  // Block opening a card that still has a temp id (mid-flight optimistic record).
+  // Opening it would pass "new-xxx" into the drawer, which the server reads as
+  // "create", producing a duplicate instead of updating the real record.
+  function openEditDrawer(app: ApplicationView) {
+    if (app.id.startsWith("new-")) return;
+    setDrawer({ mode: "edit", app });
   }
 
   const drawerApp = drawer.mode === "edit" ? drawer.app : null;
@@ -230,7 +259,6 @@ export function KanbanBoard({
       <div className="flex items-center justify-between px-5 h-[52px] border-b border-[#2d2b27] bg-[#1c1b19] shrink-0">
         <div className="flex items-center gap-3">
           <h1 className="text-[13px] font-semibold text-[#f0ede8] tracking-[-0.01em]">Board</h1>
-          {/* Stat pills */}
           <div className="hidden md:flex items-center gap-1">
             <span className="text-[11px] font-medium text-[#a8a49e] bg-[#252320] px-2 py-0.5 rounded-full tabular-nums">
               {applications.length} apps
@@ -309,13 +337,8 @@ export function KanbanBoard({
       {/* Board or Table */}
       <div className="flex-1 overflow-auto">
         {view === "kanban" ? (
-          <DndContext
-            id="jobflow-board-dnd"
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
+          <>
+            {/* Mobile stage tabs */}
             <div className="sm:hidden sticky top-0 z-10 bg-[#111110] border-b border-[#2d2b27] px-3 py-2 overflow-x-auto">
               <div className="flex gap-1 min-w-max">
                 {STAGES.map((stage) => (
@@ -335,45 +358,46 @@ export function KanbanBoard({
                 ))}
               </div>
             </div>
+
+            {/* Desktop — all columns */}
             <div className="hidden sm:flex gap-4 px-6 pt-5 pb-6 min-w-max">
               {STAGES.map((s) => (
                 <DroppableColumn
-                  key={s.slug} {...s}
+                  key={s.slug}
+                  {...s}
                   applications={grouped[s.slug]}
-                  onCardClick={(app) => setDrawer({ mode: "edit", app })}
+                  onCardClick={openEditDrawer}
                   onStarToggle={handleStarToggle}
-                  registerColumn={registerColumn}
                   onAdd={(stage) => setDrawer({ mode: "new", stage })}
+                  onDrop={handleDrop}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
                 />
               ))}
             </div>
+
+            {/* Mobile — active stage only */}
             <div className="sm:hidden px-3 py-3 pb-24">
-              {STAGES.filter((stage) => stage.slug === activeMobileStage).map((s) => (
+              {STAGES.filter((s) => s.slug === activeMobileStage).map((s) => (
                 <DroppableColumn
-                  key={s.slug} {...s}
+                  key={s.slug}
+                  {...s}
                   applications={grouped[s.slug]}
-                  onCardClick={(app) => setDrawer({ mode: "edit", app })}
+                  onCardClick={openEditDrawer}
                   onStarToggle={handleStarToggle}
-                  registerColumn={registerColumn}
                   onAdd={(stage) => setDrawer({ mode: "new", stage })}
+                  onDrop={handleDrop}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
                 />
               ))}
             </div>
-            <DragOverlay>
-              {draggingApp && (
-                <div className="rotate-1 shadow-xl w-64 opacity-95">
-                  <ApplicationCard application={draggingApp} onClick={() => {}} />
-                </div>
-              )}
-            </DragOverlay>
-          </DndContext>
+          </>
         ) : (
           <TableView
             applications={filtered}
-            onRowClick={(app) => setDrawer({ mode: "edit", app })}
-            onStageChange={(id, stage) =>
-              handleStageChange(id, stage)
-            }
+            onRowClick={openEditDrawer}
+            onStageChange={(id, stage) => handleStageChange(id, stage)}
             onDelete={handleDelete}
             onStarToggle={handleStarToggle}
           />
